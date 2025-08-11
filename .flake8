@@ -1,0 +1,10 @@
+[flake8]
+max-line-length = 120
+exclude = .git,__pycache__,build,dist,venv,env
+ignore = E203, W503, E501
+# E203: whitespace before ':', conflicts with black
+# W503: line break before binary operator, conflicts with black
+# E501: line too long, handled by black
+per-file-ignores =
+    __init__.py:F401
+    text2img.py:E402

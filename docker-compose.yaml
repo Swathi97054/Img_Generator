@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  text2img:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models
+      - ./loras:/app/loras
+      - ./outputs:/app/outputs
+      - ./logs:/app/logs
+    restart: unless-stopped
+    environment:
+      - DIFFUSERS_PROGRESS_BAR=0
+      - TRANSFORMERS_PROGRESS_BAR=0
+      - HF_HUB_DISABLE_PROGRESS_BARS=1
+      - TF_CPP_MIN_LOG_LEVEL=2
+    # Optional resource limits
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 8G
