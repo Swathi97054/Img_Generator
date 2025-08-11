@@ -44,7 +44,7 @@ A sophisticated, containerized AI service that generates high-quality images fro
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Swathi97054/Img_Generator
+   git clone https://github.com/Swathi97054/Img_Generator 
    cd t2i
    ```
 
