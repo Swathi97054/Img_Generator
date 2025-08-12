@@ -313,7 +313,7 @@ We welcome contributions! Please see our contributing guidelines for:
 
 ## 📄 License
 
-[Your license information here]
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 
