@@ -10,15 +10,13 @@ RUN apt-get update && apt-get install -y \
 
 # Create directories
 RUN mkdir -p /app/logs /app/outputs /app/models /app/loras
-# Add this to your Dockerfile to fix permissions
-RUN mkdir -p /app/models /app/loras /app/outputs /app/logs
 RUN chmod -R 777 /app/models /app/loras /app/outputs /app/logs
 
 # Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy application code (models will be mounted as volumes)
 COPY . .
 
 # Environment variables to disable progress bars and reduce logging
