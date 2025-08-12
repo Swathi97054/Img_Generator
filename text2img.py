@@ -1,7 +1,7 @@
 import os
 os.environ["HF_DATASETS_OFFLINE"] = "1" 
 os.environ["TRANSFORMERS_OFFLINE"] = "1"
-os.environ["HF_HUB_OFFLINE"] = "1"
+os.environ["HF_HUB_OFFLINE"] = "0"
 os.environ["DISABLE_TELEMETRY"] = "1"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=INFO, 2=WARNING, 3=ERROR
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'  # Disable oneDNN custom operations
@@ -1464,6 +1464,15 @@ def log_exception(e: Exception, context: str = ""):
     logger.error(f"{context} - {error_class}: {str(e)}")
     logger.debug(f"Exception traceback:\n{error_tb}")
 
+@app.get("/loras/", response_model=List[Dict])
+async def list_available_loras():
+    """List available LoRA files."""
+    # Rescan directory to pick up any new files
+    global available_loras
+    available_loras = scan_lora_files()
+    
+    return list(available_loras.values())
+
 @app.post("/generate-image/")
 async def generate_image(
     request: ImageRequest, 
@@ -1988,6 +1997,42 @@ async def find_similar_prompts(
     }
 # Add this endpoint
 
+
+
+
+@app.get("/lora/{lora_id}")
+async def get_lora_info(lora_id: str):
+    """Get details for a specific LoRA."""
+    lora_id_lower = lora_id.lower()
+    
+    if lora_id_lower not in available_loras:
+        raise HTTPException(status_code=404, detail=f"LoRA '{lora_id}' not found")
+    
+    return available_loras[lora_id_lower]    
+    
+@app.get("/memory-stats/")
+async def get_memory_stats():
+    """Get statistics about the chat memory system"""
+    return chat_memory.get_stats()
+
+@app.post("/check-prompt-intention/")
+async def check_prompt_intention(
+    prompt: str = Query(..., description="Text prompt to check for intention classification"),
+    language: Language = Query(Language.ENGLISH, description="Language of the prompt")
+):
+    """Classify the user's intention behind a prompt without generating an image."""
+    intention_result = intention_classifier.classify_intention(prompt, language.value)
+    
+    return {
+        "prompt": prompt,
+        "primary_category": intention_result["primary_category"],
+        "all_categories": intention_result["all_categories"],
+        "matches": intention_result["matches"],
+        "is_safe": intention_result["is_safe"],
+        "explanation": intention_result["explanation"],
+        "would_generate": intention_result["is_safe"] or intention_result.get("requires_review", False)
+    }
+
 @app.get("/regenerate/{chat_id}")
 async def regenerate_image(
     chat_id: str, 
@@ -2029,48 +2074,6 @@ async def regenerate_image(
     
     # Pass to main generation function
     return await generate_image(request, response_type=response_type)
-
-@app.get("/loras/", response_model=List[Dict])
-async def list_available_loras():
-    """List available LoRA files."""
-    # Rescan directory to pick up any new files
-    global available_loras
-    available_loras = scan_lora_files()
-    
-    return list(available_loras.values())
-
-@app.get("/lora/{lora_id}")
-async def get_lora_info(lora_id: str):
-    """Get details for a specific LoRA."""
-    lora_id_lower = lora_id.lower()
-    
-    if lora_id_lower not in available_loras:
-        raise HTTPException(status_code=404, detail=f"LoRA '{lora_id}' not found")
-    
-    return available_loras[lora_id_lower]    
-    
-@app.get("/memory-stats/")
-async def get_memory_stats():
-    """Get statistics about the chat memory system"""
-    return chat_memory.get_stats()
-
-@app.post("/check-prompt-intention/")
-async def check_prompt_intention(
-    prompt: str = Query(..., description="Text prompt to check for intention classification"),
-    language: Language = Query(Language.ENGLISH, description="Language of the prompt")
-):
-    """Classify the user's intention behind a prompt without generating an image."""
-    intention_result = intention_classifier.classify_intention(prompt, language.value)
-    
-    return {
-        "prompt": prompt,
-        "primary_category": intention_result["primary_category"],
-        "all_categories": intention_result["all_categories"],
-        "matches": intention_result["matches"],
-        "is_safe": intention_result["is_safe"],
-        "explanation": intention_result["explanation"],
-        "would_generate": intention_result["is_safe"] or intention_result.get("requires_review", False)
-    }
     
 @app.get("/history/{chat_id}", response_model=Dict[str, Any])
 async def get_history_by_id(
@@ -2197,12 +2200,41 @@ async def list_intention_categories():
     
 @app.get("/")
 async def root():
+    """Root endpoint providing API information"""
+    
+    available_models = await list_available_models()
     return {
         "message": "Multi-Model Multilingual Text to Image API with Safety Guardrails is running!",
+        "version": "3.0.0",
+        "available_models": available_models,
         "supported_languages": [lang.value for lang in Language],
         "safety_enabled": True,
         "intention_categories": [category.value for category in IntentionCategory],
-        "version": "3.0.0"
+        "endpoints": {
+            "/": "This information",
+            "/models": "List all available models with language support",
+            "/languages": "List all supported languages",
+            "/generate": "Generate an image from a text prompt",
+            "/analyze-and-enhance-prompt": "Analyze a prompt and suggest improvements",
+            "/check-prompt-safety": "Check if a prompt is safe without generating an image",
+            "/check-prompt-intention": "Classify the intention behind a prompt",
+            "/safety-categories": "List all safety categories with descriptions",
+            "/intention-categories": "List all intention categories with descriptions",
+            "/loras": "List all available LoRA models",
+            "/generate-with-lora": "Generate an image using a LoRA model on top of a base model",
+            "/lora/{lora_id}": "Get details for a specific LoRA model",
+            "/regenerate/{chat_id}": "Regenerate an image using the same settings as a previous generation",
+            "/history/{chat_id}": "Retrieve a specific chat history item by its ID",
+            "/user-history/{user_id}": "Get chat history for a specific user",
+            "/similar-prompts": "Find similar prompts from chat history",
+            "/memory-stats": "Get statistics about the chat memory system",
+            "/check-prompt-intention": "Classify the intention behind a prompt",
+            "/intention-categories": "List all intention categories with descriptions",
+            "documentation": {
+            "swagger_ui": "/docs",
+            "redoc": "/redoc"
+        }
+        }
     }
 
 # Add this function to check system health periodically
